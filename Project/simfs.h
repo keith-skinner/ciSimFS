@@ -4,19 +4,21 @@
 #include <time.h>
 #include <stdlib.h>
 #include <string.h>
-#include <fuse.h>
-
+#include "fuse.h"
+#include <limits.h>
+#include <stdio.h>
+#include <unistd.h>
 //////////////////////////////////////////////////////////////////////////
 //
 // defines for the volume
 //
 //////////////////////////////////////////////////////////////////////////
 
-#define SIMFS_BLOCK_SIZE 256
-#define SIMFS_NUMBER_OF_BLOCKS 65536 // 2^16
-#define SIMFS_MAX_NAME_LENGTH 128
-#define SIMFS_DATA_SIZE 254 // SIMFS_BLOCK_SIZE - sizeof(SIMFS_NODE_TYPE)
-#define SIMFS_INDEX_SIZE 127 // two bytes => x0000 - xFFFF => 2^16 range
+#define SIMFS_BLOCK_SIZE 16 // 256
+#define SIMFS_NUMBER_OF_BLOCKS 4096 // 65536 // 2^16
+#define SIMFS_MAX_NAME_LENGTH 64 // 128
+#define SIMFS_DATA_SIZE 14 // 254 // SIMFS_BLOCK_SIZE - sizeof(SIMFS_NODE_TYPE)
+#define SIMFS_INDEX_SIZE 7 // 127 // two bytes => x0000 - xFFFF => 2^16 range
 
 //////////////////////////////////////////////////////////////////////////
 //
@@ -24,10 +26,10 @@
 //
 //////////////////////////////////////////////////////////////////////////
 
-#define SIMFS_DIRECTORY_SIZE 65551 // prime number for the size of the directory (it is larger than 2^16)
-#define SIMFS_MAX_NUMBER_OF_OPEN_FILES 1024
-#define SIMFS_MAX_NUMBER_OF_PROCESSES 1024
-#define SIMFS_MAX_NUMBER_OF_OPEN_FILES_PER_PROCESS 64
+#define SIMFS_DIRECTORY_SIZE 4099 // 65537 // prime number for the size of the directory (it is larger than 2^16)
+#define SIMFS_MAX_NUMBER_OF_OPEN_FILES 64 // 1024
+#define SIMFS_MAX_NUMBER_OF_PROCESSES 64 // 1024
+#define SIMFS_MAX_NUMBER_OF_OPEN_FILES_PER_PROCESS 16 // 64
 
 //////////////////////////////////////////////////////////////////////////
 //
@@ -44,7 +46,7 @@ typedef enum {
 } SIMFS_CONTENT_TYPE;
 
 typedef unsigned short SIMFS_INDEX_TYPE; // is used to index blocks in the file system
-#define SIMFS_INVALID_INDEX 0xFF
+#define SIMFS_INVALID_INDEX ((SIMFS_INDEX_TYPE)0xFF)
 
 //
 // superblock starting block in the whole file system
@@ -100,7 +102,7 @@ typedef struct simfs_node_type {
     SIMFS_CONTENT_TYPE type;
     union { // content depends on the type
         SIMFS_FILE_DESCRIPTOR_TYPE fileDescriptor; // for directories and files
-        SIMFS_DATA_TYPE data[SIMFS_DATA_SIZE]; // for data
+        SIMFS_DATA_TYPE data; // for data
         SIMFS_INDEX_TYPE index[SIMFS_INDEX_SIZE];  // for indices; all indices but the last point to data blocks
         // the last points to another index block
     } content;
@@ -118,37 +120,21 @@ typedef struct simfs_node_type {
 //
 typedef struct simfs_volume {
     SIMFS_SUPERBLOCK_TYPE superblock;
-    char bitvector[SIMFS_NUMBER_OF_BLOCKS / 8]; //
+    unsigned char bitvector[SIMFS_NUMBER_OF_BLOCKS / 8]; //
     SIMFS_BLOCK_TYPE block[SIMFS_NUMBER_OF_BLOCKS];
 } SIMFS_VOLUME;
 
-//////////////////////////////////////////////////////////////////////////
-//
-// definitions for in-memory data structures supporting the file system
-//
-//////////////////////////////////////////////////////////////////////////
-
-//
-// file system directory
-//
-// directory entry in the conflict resolution linked list with the head in the hash table slot for
-// the corresponding name
-//
+//node for hast table (SIMFS_DIRECTORY)
 typedef struct simfs_dir_ent {
     SIMFS_INDEX_TYPE nodeReference; // points to the "physical" file descriptor node
     struct simfs_dir_ent *next;
 } SIMFS_DIR_ENT;
 
-//
-// directory implemented as a hash table
-//
-// slots are heads to resolution lists for conflicting names
-//
-typedef SIMFS_DIR_ENT SIMFS_DIRECTORY[SIMFS_DIRECTORY_SIZE];
+//Hash table for file system entry names
+typedef SIMFS_DIR_ENT *SIMFS_DIRECTORY[SIMFS_DIRECTORY_SIZE];
 
-//
+
 // global open file table
-//
 typedef struct simfs_open_file_global_type {
     SIMFS_CONTENT_TYPE type; // folder or file
     SIMFS_INDEX_TYPE fileDescriptor; // reference to the file descriptor node
@@ -161,31 +147,35 @@ typedef struct simfs_open_file_global_type {
     size_t size;
 } SIMFS_OPEN_FILE_GLOBAL_TABLE_TYPE;
 
-//
+
 // per-process open file table
-//
 typedef int SIMFS_FILE_HANDLE_TYPE;
-typedef struct simfs_per_process_open_file_type // a node for a local list of open files (per process)
+// a node for a local list of open files (per process)
+typedef struct simfs_per_process_open_file_type
 {
-    mode_t accessRights; // access rights for this process
-    SIMFS_OPEN_FILE_GLOBAL_TABLE_TYPE *globalEntry; // link to the entry for the file in the global table
+    // access rights for this process
+    mode_t accessRights;
+    // link to the entry for the file in the global table
+    SIMFS_OPEN_FILE_GLOBAL_TABLE_TYPE *globalEntry;
 } SIMFS_PER_PROCESS_OPEN_FILE_TYPE;
 
 typedef struct simfs_process_control_block_type {
-    pid_t pid; // process identifier
+    // process identifier
+    pid_t pid;
     int numberOfOpenFiles;
-    SIMFS_INDEX_TYPE currentWorkingDirectory; // current working directory; set to the root of the volume on mounting
+    // current working directory; set to the root of the volume on mounting
+    SIMFS_INDEX_TYPE currentWorkingDirectory;
     SIMFS_PER_PROCESS_OPEN_FILE_TYPE openFileTable[SIMFS_MAX_NUMBER_OF_OPEN_FILES_PER_PROCESS];
     struct simfs_process_control_block_type *next;
 } SIMFS_PROCESS_CONTROL_BLOCK_TYPE;
 
-/*
- * file system context
- */
+// file system context
 typedef struct simfs_context_type {
-    SIMFS_DIRECTORY directory; // the hashtable-based in-memory directory
-    char bitvector[SIMFS_NUMBER_OF_BLOCKS / 8]; // an in-memory copy of the bitvector of the simulated volume
-    SIMFS_OPEN_FILE_GLOBAL_TABLE_TYPE globalOpenFileTable[SIMFS_MAX_NUMBER_OF_OPEN_FILES]; // in-memory
+    // the hashtable-based in-memory directory
+    SIMFS_DIRECTORY directory;
+    // an in-memory copy of the bitvector of the simulated volume
+    unsigned char bitvector[SIMFS_NUMBER_OF_BLOCKS / 8];
+    SIMFS_OPEN_FILE_GLOBAL_TABLE_TYPE globalOpenFileTable[SIMFS_MAX_NUMBER_OF_OPEN_FILES];
     SIMFS_PROCESS_CONTROL_BLOCK_TYPE *processControlBlocks;
 } SIMFS_CONTEXT_TYPE;
 
@@ -206,29 +196,30 @@ typedef enum simfs_error {
     SIMFS_READ_ERROR
 } SIMFS_ERROR;
 
-SIMFS_ERROR simfsMountFileSystem(SIMFS_VOLUME *fileSystem);
-
+SIMFS_ERROR simfsMountFileSystem(char *simfsFileName);
 SIMFS_ERROR simfsCreateFile(SIMFS_NAME_TYPE fileName, SIMFS_CONTENT_TYPE type);
-
 SIMFS_ERROR simfsDeleteFile(SIMFS_NAME_TYPE fileName);
-
 SIMFS_ERROR simfsGetFileInfo(SIMFS_NAME_TYPE fileName, SIMFS_FILE_DESCRIPTOR_TYPE *infoBuffer);
-
 SIMFS_ERROR simfsOpenFile(SIMFS_NAME_TYPE fileName, SIMFS_FILE_HANDLE_TYPE *fileHandle);
-
 SIMFS_ERROR simfsWriteFile(SIMFS_FILE_HANDLE_TYPE fileHandle, char *writeBuffer);
-
 SIMFS_ERROR simfsReadFile(SIMFS_FILE_HANDLE_TYPE fileHandle, char **readBuffer);
-
 SIMFS_ERROR simfsCloseFile(SIMFS_FILE_HANDLE_TYPE fileHandle);
+SIMFS_ERROR simfsCreateFileSystem(char *simfsFileName);
+SIMFS_ERROR simfsUmountFileSystem(char *simfsFileName);
+// ... other functions already in there
+unsigned long hash(char *str); //done - given
+void simfsFlipBit(unsigned char *bitvector, unsigned short bitIndex);//done - given
+void simfsSetBit(unsigned char *bitvector, unsigned short bitIndex); //done - given
+void simfsClearBit(unsigned char *bitvector, unsigned short bitIndex); //done - given
+unsigned short simfsFindFreeBlock(unsigned char *bitvector); //done - given
 
 /*
- * The following functions can be used to simulate FUSE context's user and process identifiers for testing.
- *
- * These identifiers are obtainable by calling fuse_get_context() the fuse library.
+ * The following functions can be used to simulate FUSE context's user and 
+ * process identifiers for testing. These identifiers are obtainable by 
+ * calling fuse_get_context() the fuse library.
  */
-
-struct fuse_context *simfs_debug_get_context(); // follows FUSE naming convention
+// follows FUSE naming convention
+struct fuse_context *simfs_debug_get_context();
 char *simfsGenerateContent(int size);
 
 #endif
