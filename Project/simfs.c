@@ -12,8 +12,9 @@ void help_setupSubDirectory(size_t size, SIMFS_BLOCK_TYPE *block);
 SIMFS_CONTEXT_TYPE *simfsContext;
 SIMFS_VOLUME *simfsVolume;
 
-/*
- * Retuns a hash value within the limits of the directory.
+/**
+ * @param str : the value to hash
+ * @return : A hash value within the limits of the directory
  */
 inline unsigned long hash(char *str)
 {
@@ -24,6 +25,10 @@ inline unsigned long hash(char *str)
     return hash % SIMFS_DIRECTORY_SIZE;
 }
 
+/**
+ * Finds a free block and sets that bit to being used in the bitvector
+ * @return the index to the new block
+ */
 inline SIMFS_INDEX_TYPE simfsAllocateBlock()
 {
     SIMFS_INDEX_TYPE index = simfsFindFreeBlock(simfsContext->bitvector);
@@ -31,20 +36,32 @@ inline SIMFS_INDEX_TYPE simfsAllocateBlock()
     return index;
 }
 
+/**
+ * Finds a block index labeled free in the bitvector
+ * @return the index to the free block
+ */
 inline SIMFS_INDEX_TYPE simfsFindFreeBlock(unsigned char *bitvector)
 {
+    //find a byte not yet full of all 1's
     SIMFS_INDEX_TYPE i = 0;
     while (bitvector[i] == 0xFF)
         i += 1;
 
+    //find out which bit is the first 0 bit
     register unsigned char mask = 0x80;
     SIMFS_INDEX_TYPE j = 0;
     while (bitvector[i] & mask)
         mask >>= ++j;
 
+    //return the index
     return (SIMFS_INDEX_TYPE)((i * 8) + j); // i bytes and j bits are all "1", so this formula points to the first "0"
 }
 
+/**
+ * Flip a specific bit in the bitvector. Specifically the bitIndex
+ * @param bitvector : who's getting their bit flipped?
+ * @param bitIndex : which bit is getting flipped?
+ */
 inline void simfsFlipBit(unsigned char *bitvector, SIMFS_INDEX_TYPE bitIndex)
 {
     SIMFS_INDEX_TYPE blockIndex = (SIMFS_INDEX_TYPE)(bitIndex / 8);
@@ -53,6 +70,11 @@ inline void simfsFlipBit(unsigned char *bitvector, SIMFS_INDEX_TYPE bitIndex)
     bitvector[blockIndex] ^= (mask >> bitShift);
 }
 
+/**
+ * Set a specific bit in the bitvector to 1.
+ * @param bitvector : Who's getting their bit flipped?
+ * @param bitIndex : which bit is getting flipped?
+ */
 inline void simfsSetBit(unsigned char *bitvector, SIMFS_INDEX_TYPE bitIndex)
 {
     SIMFS_INDEX_TYPE blockIndex = (SIMFS_INDEX_TYPE)(bitIndex / 8);
@@ -61,6 +83,11 @@ inline void simfsSetBit(unsigned char *bitvector, SIMFS_INDEX_TYPE bitIndex)
     bitvector[blockIndex] |= (mask >> bitShift);
 }
 
+/**
+ * Set a specific bit in the bitvector to 0.
+ * @param bitvector : Who's getting their bit flipped?
+ * @param bitIndex : which bit is getting flipped?
+ */
 inline void simfsClearBit(unsigned char *bitvector, SIMFS_INDEX_TYPE bitIndex)
 {
     SIMFS_INDEX_TYPE blockIndex = (SIMFS_INDEX_TYPE)(bitIndex / 8);
@@ -69,6 +96,11 @@ inline void simfsClearBit(unsigned char *bitvector, SIMFS_INDEX_TYPE bitIndex)
     bitvector[blockIndex] &= ~(mask >> bitShift);
 }
 
+
+/**
+ * Set the creationTime, lastAccessTime and lastModificationTime of a file to now.
+ * @param block : reference to the block that holds the the file descriptor to the newly created file
+ */
 inline void simfsCreateFileTime(SIMFS_BLOCK_TYPE * block)
 {
     struct timespec time;
@@ -78,73 +110,78 @@ inline void simfsCreateFileTime(SIMFS_BLOCK_TYPE * block)
     block->content.fileDescriptor.lastModificationTime = time.tv_sec;
 }
 
-/*
- * Allocates space for the file system and saves it to disk.
+/**
+ * Initiate the superblock for first time use in the simfsVolume
  */
-SIMFS_ERROR simfsCreateFileSystem(char *simfsFileName)
+void initSuperBlock()
 {
-    //create the simfsVolume
-    simfsVolume = malloc(sizeof(SIMFS_VOLUME));
-    if (simfsVolume == NULL)
-        return SIMFS_ALLOC_ERROR;
-
-    // initialize the superblock
     simfsVolume->superblock.attr.rootNodeIndex = 0;
     simfsVolume->superblock.attr.blockSize = SIMFS_BLOCK_SIZE;
     simfsVolume->superblock.attr.numberOfBlocks = SIMFS_NUMBER_OF_BLOCKS;
-
-    // initialize the blocks holding the root folder
     simfsFlipBit(simfsVolume->bitvector, simfsVolume->superblock.attr.rootNodeIndex);
+}
 
-    // initialize the root folder
-    simfsVolume->block[0].type = FOLDER_CONTENT_TYPE;
-    simfsVolume->block[0].content.fileDescriptor.type = FOLDER_CONTENT_TYPE;
-    strcpy(simfsVolume->block[0].content.fileDescriptor.name, "/");
-    simfsVolume->block[0].content.fileDescriptor.size = 0;
-    simfsCreateFileTime(0);
-    //TODO: These values need to be looked into.
-    simfsVolume->block[0].content.fileDescriptor.accessRights = (mode_t)umask(00000);
-    simfsVolume->block[0].content.fileDescriptor.owner = 0;
-
-    // initialize the index block of the root folder
+/**
+ * Create the index block for the root folder
+ */
+void initRootFolderIndex()
+{
     simfsFlipBit(simfsVolume->bitvector, 1);
     simfsVolume->block[0].content.fileDescriptor.block_ref = 1;
     simfsVolume->block[1].type = INDEX_CONTENT_TYPE;
-
-    FILE *file = fopen(simfsFileName, "wb");
-    if (file == NULL) 
-        return SIMFS_ALLOC_ERROR;
-    fwrite(simfsVolume, 1, sizeof(SIMFS_VOLUME), file);
-    fclose(file);
-
-    free(simfsVolume);
-    simfsVolume = NULL;
-    return SIMFS_NO_ERROR;
 }
 
-/*
- * Loads the file system from a disk and constructs in-memory directory of all files is the system.
- *
- * Starting with the file system root (pointed to from the superblock) traverses the hierarachy of directories
- * and adds en entry for each folder or file to the directory by hashing the name and adding a directory
- * entry node to the conflict resolution list for that entry. If the entry is NULL, the new node will be
- * the only element of that list.
- *
- * The function sets the current working directory to refer to the block holding the root of the volume. This will
- * be changed as the user navigates the file system hierarchy.
- *
- */
-SIMFS_ERROR help_setupVolume(char *simfsFileName)
+void initRootFolder()
 {
-    simfsVolume = malloc(sizeof(SIMFS_VOLUME));
-    if (simfsVolume == NULL) return SIMFS_ALLOC_ERROR;
-    FILE *file = fopen(simfsFileName, "rb");
-    if (file == NULL) return SIMFS_ALLOC_ERROR;
+    SIMFS_BLOCK_TYPE * block = &simfsVolume->block[0];
+    block->type = FOLDER_CONTENT_TYPE;
+    block->content.fileDescriptor.type = FOLDER_CONTENT_TYPE;
+    strcpy(block->content.fileDescriptor.name, "/");
+    block->content.fileDescriptor.accessRights = (mode_t)umask(00000);
+    block->content.fileDescriptor.owner = 0;
+    simfsCreateFileTime(0);
+
+    block->content.fileDescriptor.size = 0;
+    initRootFolderIndex();
+}
+
+SIMFS_ERROR readVolumeFromFile(char * fileName)
+{
+    FILE *file = fopen(fileName, "rb");
+    if (file == NULL)
+        return SIMFS_ALLOC_ERROR;
     fread(simfsVolume, 1, sizeof(SIMFS_VOLUME), file);
     fclose(file);
     return SIMFS_NO_ERROR;
 }
-SIMFS_ERROR help_setupContext()
+
+SIMFS_ERROR writeVolumeToFile(char * fileName)
+{
+    FILE *file = fopen(fileName, "wb");
+    if (file == NULL)
+        return SIMFS_ALLOC_ERROR;
+    fwrite(simfsVolume, 1, sizeof(SIMFS_VOLUME), file);
+    fclose(file);
+    return SIMFS_NO_ERROR;
+}
+
+/**
+ * Malloc the simfs Volume and then read the data from the file into the volume
+ * @param fileName : the name of the file what holds
+ * @return
+ */
+SIMFS_ERROR initVolume(char * fileName)
+{
+    simfsVolume = malloc(sizeof(SIMFS_VOLUME));
+    if (simfsVolume == NULL)
+        return SIMFS_ALLOC_ERROR;
+    if (fileName != NULL)
+        if (readVolumeFromFile(fileName) != SIMFS_NO_ERROR)
+            return SIMFS_ALLOC_ERROR;
+    return SIMFS_NO_ERROR;
+}
+
+SIMFS_ERROR initContext()
 {
     simfsContext = calloc(1, sizeof(SIMFS_CONTEXT_TYPE));
     if (simfsContext == NULL)
@@ -153,8 +190,45 @@ SIMFS_ERROR help_setupContext()
     return SIMFS_NO_ERROR;
 }
 
+void freeProcessControlBlocks()
+{
+    SIMFS_PROCESS_CONTROL_BLOCK_TYPE * iter = simfsContext->processControlBlocks;
+    while (iter != NULL) {
+        SIMFS_PROCESS_CONTROL_BLOCK_TYPE * temp = iter;
+        iter = iter->next;
+        free(temp);
+    }
+}
 
-void help_addDirectory(SIMFS_INDEX_TYPE index)
+
+void releaseVolume(char * fileName)
+{
+    writeVolumeToFile(fileName);
+    free(simfsVolume);
+    simfsVolume = NULL;
+}
+
+void releaseContext()
+{
+    freeProcessControlBlocks();
+    free(simfsContext);
+    simfsContext = NULL;
+}
+
+/*
+ * Allocates space for the file system and saves it to disk.
+ */
+SIMFS_ERROR simfsCreateFileSystem(char *simfsFileName)
+{
+    if (initVolume(NULL) != SIMFS_NO_ERROR)
+        return SIMFS_ALLOC_ERROR;
+    initSuperBlock();
+    initRootFolder();
+    releaseVolume(simfsFileName);
+    return SIMFS_NO_ERROR;
+}
+
+void addDirectory(SIMFS_INDEX_TYPE index)
 {
     unsigned long dir_index = hash(simfsVolume->block[index].content.fileDescriptor.name);
     SIMFS_DIR_ENT * entry = malloc(sizeof(SIMFS_DIR_ENT));
@@ -162,61 +236,55 @@ void help_addDirectory(SIMFS_INDEX_TYPE index)
     entry->nodeReference = index;
     simfsContext->directory[dir_index] = entry;
 }
-void help_setupSubDirectory(size_t size, SIMFS_BLOCK_TYPE *block)
+
+void mountDirectory(SIMFS_INDEX_TYPE index);
+void mountSubDirectory(size_t size, SIMFS_BLOCK_TYPE *block)
 {
     const size_t index_block_size = SIMFS_INDEX_SIZE - 1;
     for (size_t index_block = 0; index_block < (size / index_block_size); ++index_block) {
         for (size_t index = 0; index < index_block_size; ++index)
-            help_setupDirectory(block->content.index[index]);
-        block = &(simfsVolume->block[SIMFS_INDEX_SIZE]);
+            mountDirectory(block->content.index[index]);
+        block = &(simfsVolume->block[index_block_size]);
     }
     for (size_t index = 0; index < (size % index_block_size); ++index)
-        help_setupDirectory(block->content.index[index]);
+        mountDirectory(block->content.index[index]);
 }
-void help_setupDirectory(SIMFS_INDEX_TYPE index)
+
+void mountDirectory(SIMFS_INDEX_TYPE index)
 {
-    help_addDirectory(index);
+    //add this di
+    addDirectory(index);
     if (simfsVolume->block[index].type == FILE_CONTENT_TYPE)
         return;
 
-    help_setupSubDirectory(
+    mountSubDirectory(
             simfsVolume->block[index].content.fileDescriptor.size,
-            &(simfsVolume->block[simfsVolume->block[index].content.fileDescriptor.block_ref])
-    );
+            &(simfsVolume->block[simfsVolume->block[index].content.fileDescriptor.block_ref]) );
 }
 
 SIMFS_ERROR simfsMountFileSystem(char *simfsFileName)
 {
     //TODO: implement - DONE
-    SIMFS_ERROR error = help_setupVolume(simfsFileName);
+    SIMFS_ERROR error = initVolume(simfsFileName);
     if (error != SIMFS_NO_ERROR)
         return error;
-
-    error = help_setupContext();
+    error = initContext();
     if (error != SIMFS_NO_ERROR)
         return error;
-
-    help_setupDirectory(simfsVolume->superblock.attr.rootNodeIndex);
+    mountDirectory(simfsVolume->superblock.attr.rootNodeIndex);
+    //copy bit vector
     return SIMFS_NO_ERROR;
 }
 
 /*
  * Saves the file system to a disk and de-allocates the memory.
- *
  * Assumes that all synchronization has been done.
- *
  */
 SIMFS_ERROR simfsUmountFileSystem(char *simfsFileName)
 {
-    FILE *file = fopen(simfsFileName, "wb");
-    if (file == NULL)
-        return SIMFS_ALLOC_ERROR;
-
-    fwrite(simfsVolume, 1, sizeof(SIMFS_VOLUME), file);
-    fclose(file);
-
-    free(simfsVolume);
-    free(simfsContext);
+    //TODO: implement - DONE
+    releaseVolume(simfsFileName);
+    releaseContext();
     return SIMFS_NO_ERROR;
 }
 
@@ -239,7 +307,6 @@ SIMFS_ERROR simfsUmountFileSystem(char *simfsFileName)
  *    - copies the in-memory bitvector to the bitevector blocks on the simulated disk
  *
  *  The access rights and the the owner are taken from the context (umask and uid correspondingly).
- *
  */
 SIMFS_PROCESS_CONTROL_BLOCK_TYPE * findControlBlock(SIMFS_PROCESS_CONTROL_BLOCK_TYPE * controlBlocks, pid_t pid)
 {
@@ -251,10 +318,16 @@ SIMFS_PROCESS_CONTROL_BLOCK_TYPE * findControlBlock(SIMFS_PROCESS_CONTROL_BLOCK_
     return controlBlocks;
 }
 
-SIMFS_INDEX_TYPE findFile(SIMFS_NAME_TYPE fileName)
+SIMFS_DIR_ENT * getDirectoryByFileName(SIMFS_NAME_TYPE fileName)
 {
     unsigned long pos = hash(fileName);
     SIMFS_DIR_ENT * entry = simfsContext->directory[pos];
+    return entry;
+}
+
+SIMFS_INDEX_TYPE findFile(SIMFS_NAME_TYPE fileName)
+{
+    SIMFS_DIR_ENT * entry = getDirectoryByFileName(fileName);
     SIMFS_BLOCK_TYPE * block = &simfsVolume->block[entry->nodeReference];
     while( entry != NULL) {
         if (strcmp(fileName, block->content.fileDescriptor.name) == 0)
@@ -274,16 +347,15 @@ SIMFS_BLOCK_TYPE newFileBlock(SIMFS_NAME_TYPE name, struct fuse_context * contex
     block.content.fileDescriptor.accessRights = context->umask;
     strcpy(block.content.fileDescriptor.name, name);
     simfsCreateFileTime(&block);
-    block.content.fileDescriptor.block_ref = (block.type == FOLDER_CONTENT_TYPE) ?
-         simfsAllocateBlock() : SIMFS_INVALID_INDEX;
-
+    block.content.fileDescriptor.block_ref =
+            (block.type == FOLDER_CONTENT_TYPE) ? simfsAllocateBlock() : SIMFS_INVALID_INDEX;
     return block;
 }
 
 void newFileDirectoryEntry(SIMFS_NAME_TYPE fileName, SIMFS_INDEX_TYPE pos)
 {
     unsigned long dir_index = hash(fileName);
-    SIMFS_DIR_ENT * entry = malloc(sizeof(SIMFS_DIR_ENT));
+    SIMFS_DIR_ENT * entry = getDirectoryByFileName(fileName);
     entry->next = simfsContext->directory[dir_index];
     simfsContext->directory[dir_index] = entry;
     entry->nodeReference = pos;

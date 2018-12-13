@@ -10,9 +10,9 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 
-#find_package(FUSE REQUIRED)
-#include_directories(${FUSE_INCLUDE_DIR})
+find_package(FUSE REQUIRED)
+include_directories(${FUSE_INCLUDE_DIR})
 
 add_executable(simfs test_simfs.c simfs.c)
 
-#target_link_libraries(simfs ${FUSE_LIBRARIES})
+target_link_libraries(simfs ${FUSE_LIBRARIES})
