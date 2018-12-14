@@ -1,3 +1,9 @@
+/*
+ * Keith Skinner
+ * Lab: Project
+ * Date: 12/13/2018
+ */
+
 #ifndef __SIMFS_H_
 #define __SIMFS_H_
 
@@ -199,15 +205,14 @@ typedef enum simfs_error {
 
 SIMFS_ERROR simfsMountFileSystem(char *simfsFileName);
 SIMFS_ERROR simfsUmountFileSystem(char *simfsFileName);
-
 SIMFS_ERROR simfsCreateFileSystem(char *simfsFileName);
+SIMFS_ERROR simfsGetFileInfo(SIMFS_NAME_TYPE fileName, SIMFS_FILE_DESCRIPTOR_TYPE *infoBuffer);
+
 SIMFS_ERROR simfsCreateFile(SIMFS_NAME_TYPE fileName, SIMFS_CONTENT_TYPE type);
 SIMFS_ERROR simfsDeleteFile(SIMFS_NAME_TYPE fileName);
-SIMFS_ERROR simfsGetFileInfo(SIMFS_NAME_TYPE fileName, SIMFS_FILE_DESCRIPTOR_TYPE *infoBuffer);
 
 SIMFS_ERROR simfsOpenFile(SIMFS_NAME_TYPE fileName, SIMFS_FILE_HANDLE_TYPE *fileHandle);
 SIMFS_ERROR simfsCloseFile(SIMFS_FILE_HANDLE_TYPE fileHandle);
-
 SIMFS_ERROR simfsWriteFile(SIMFS_FILE_HANDLE_TYPE fileHandle, char *writeBuffer);
 SIMFS_ERROR simfsReadFile(SIMFS_FILE_HANDLE_TYPE fileHandle, char **readBuffer);
 

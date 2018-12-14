@@ -1,3 +1,9 @@
+#/*
+# * Keith Skinner
+# * Lab: Project
+# * Date: 12/13/2018
+# */
+
 cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
 project(simfs VERSION 0.0.1 LANGUAGES C)
 
