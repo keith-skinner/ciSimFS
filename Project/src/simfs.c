@@ -413,7 +413,7 @@ SIMFS_INDEX_TYPE getCurrentWorkingDirectory(struct fuse_context *context){
 void addFileToDirectory(SIMFS_INDEX_TYPE directory, SIMFS_INDEX_TYPE file) {
     size_t size = simfsVolume->block[directory].content.fileDescriptor.size;
     SIMFS_INDEX_TYPE index = simfsVolume->block[directory].content.fileDescriptor.block_ref;
-    for (int i = 0; i < size / (SIMFS_INDEX_SIZE - 1); ++i)
+    for (unsigned long i = 0; i < size / (SIMFS_INDEX_SIZE - 1); ++i)
         index = simfsVolume->block[index].content.index[SIMFS_INDEX_SIZE - 1];
     if (size % (SIMFS_INDEX_SIZE - 1) == 0) {
         simfsVolume->block[index].content.index[SIMFS_INDEX_SIZE - 1] = simfsAllocateBlock();
@@ -466,14 +466,14 @@ bool hasDeleteAccess(SIMFS_INDEX_TYPE file, struct fuse_context *context) {
 
 void deleteIndexBlock(size_t size, SIMFS_INDEX_TYPE index)
 {
-    for (int i = 0; i < size / (SIMFS_INDEX_SIZE - 1); ++i) {
+    for (unsigned long i = 0; i < size / (SIMFS_INDEX_SIZE - 1); ++i) {
         for (int j = 0; j<(SIMFS_INDEX_SIZE-1); ++j)
             simfsDeallocateBlock(simfsVolume->block[index].content.index[j]);
         SIMFS_INDEX_TYPE temp = index;
         index = simfsVolume->block[index].content.index[SIMFS_INDEX_SIZE - 1];
         simfsDeallocateBlock(temp);
     }
-    for (int i=0; i<size % (SIMFS_INDEX_SIZE-1); ++i) {
+    for (unsigned long i=0; i<size % (SIMFS_INDEX_SIZE-1); ++i) {
         simfsDeallocateBlock(simfsVolume->block[index].content.index[i]);
     }
     simfsDeallocateBlock(index);
@@ -756,7 +756,7 @@ SIMFS_ERROR simfsReadFile(SIMFS_FILE_HANDLE_TYPE fileHandle, char **readBuffer) 
     char *contents = calloc(size + 1, sizeof(char));
     int i = 0;
     if (size > SIMFS_DATA_SIZE) {
-        for (int indexPage = 0; indexPage < size / (SIMFS_INDEX_SIZE - 1); ++indexPage) {
+        for (unsigned long indexPage = 0; indexPage < size / (SIMFS_INDEX_SIZE - 1); ++indexPage) {
             for (int dataIter = 0; dataIter < SIMFS_INDEX_SIZE - 1; ++dataIter) {
                 SIMFS_INDEX_TYPE dataBlock = simfsVolume->block[index].content.index[dataIter];
                 for (int data = 0; data < SIMFS_BLOCK_SIZE; ++data)
@@ -770,7 +770,7 @@ SIMFS_ERROR simfsReadFile(SIMFS_FILE_HANDLE_TYPE fileHandle, char **readBuffer) 
                 contents[i++] = simfsVolume->block[dataBlock].content.data[data];
         }
     } else {
-        for (int data = 0; data < size; ++data)
+        for (unsigned long data = 0; data < size; ++data)
             contents[i++] = simfsVolume->block[index].content.data[data];
     }
 
