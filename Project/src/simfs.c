@@ -16,10 +16,6 @@ void simfsDeallocateBlock(SIMFS_INDEX_TYPE index);
 
 SIMFS_INDEX_TYPE simfsAllocateBlock();
 
-// all in-memory information about the system
-SIMFS_CONTEXT_TYPE *simfsContext;
-SIMFS_VOLUME *simfsVolume;
-
 
 /**
  * @param str : the value to hash
@@ -33,81 +29,7 @@ inline unsigned long hash(char *str) {
     return hash % SIMFS_DIRECTORY_SIZE;
 }
 
-/**
- * Finds a free block and sets that bit to being used in the bitvector
- * @return the index to the new block
- */
-inline SIMFS_INDEX_TYPE simfsAllocateBlock() {
-    SIMFS_INDEX_TYPE index = simfsFindFreeBlock(simfsContext->bitvector);
-    simfsSetBit(simfsContext->bitvector, index);
-    simfsSetBit(simfsVolume->bitvector, index);
-    return index;
-}
 
-/**
- * flips the index bit in the volume and context
- * @param index : the bit to be flipped
- */
-inline void simfsDeallocateBlock(SIMFS_INDEX_TYPE index) {
-    simfsClearBit(simfsContext->bitvector, index);
-    simfsClearBit(simfsVolume->bitvector, index);
-}
-
-/**
- * Finds a block index labeled free in the bitvector
- * @return the index to the free block
- */
-inline SIMFS_INDEX_TYPE simfsFindFreeBlock(unsigned char *bitvector) {
-    //find a byte not yet full of all 1's
-    SIMFS_INDEX_TYPE i = 0;
-    while (bitvector[i] == 0xFF)
-        i += 1;
-
-    //find out which bit is the first 0 bit
-    register unsigned char mask = 0x80;
-    SIMFS_INDEX_TYPE j = 0;
-    while (bitvector[i] & mask)
-        mask >>= ++j;
-
-    //return the index
-    return (SIMFS_INDEX_TYPE) ((i * 8) + j); // i bytes and j bits are all "1", so this formula points to the first "0"
-}
-
-/**
- * Flip a specific bit in the bitvector. Specifically the bitIndex
- * @param bitvector : who's getting their bit flipped?
- * @param bitIndex : which bit is getting flipped?
- */
-inline void simfsFlipBit(unsigned char *bitvector, SIMFS_INDEX_TYPE bitIndex) {
-    SIMFS_INDEX_TYPE blockIndex = (SIMFS_INDEX_TYPE) (bitIndex / 8);
-    SIMFS_INDEX_TYPE bitShift = (SIMFS_INDEX_TYPE) (bitIndex % 8);
-    register unsigned char mask = 0x80;
-    bitvector[blockIndex] ^= (mask >> bitShift);
-}
-
-/**
- * Set a specific bit in the bitvector to 1.
- * @param bitvector : Who's getting their bit flipped?
- * @param bitIndex : which bit is getting flipped?
- */
-inline void simfsSetBit(unsigned char *bitvector, SIMFS_INDEX_TYPE bitIndex) {
-    SIMFS_INDEX_TYPE blockIndex = (SIMFS_INDEX_TYPE) (bitIndex / 8);
-    SIMFS_INDEX_TYPE bitShift = (SIMFS_INDEX_TYPE) (bitIndex % 8);
-    register unsigned char mask = 0x80;
-    bitvector[blockIndex] |= (mask >> bitShift);
-}
-
-/**
- * Set a specific bit in the bitvector to 0.
- * @param bitvector : Who's getting their bit flipped?
- * @param bitIndex : which bit is getting flipped?
- */
-inline void simfsClearBit(unsigned char *bitvector, SIMFS_INDEX_TYPE bitIndex) {
-    SIMFS_INDEX_TYPE blockIndex = (SIMFS_INDEX_TYPE) (bitIndex / 8);
-    SIMFS_INDEX_TYPE bitShift = (SIMFS_INDEX_TYPE) (bitIndex % 8);
-    register unsigned char mask = 0x80;
-    bitvector[blockIndex] &= ~(mask >> bitShift);
-}
 
 
 /**
@@ -388,7 +310,7 @@ SIMFS_INDEX_TYPE findFile(SIMFS_NAME_TYPE fileName) {
  * @return : a new file descriptor block
  */
 SIMFS_BLOCK_TYPE newFileBlock(SIMFS_NAME_TYPE name, struct fuse_context *context, SIMFS_CONTENT_TYPE type) {
-    SIMFS_BLOCK_TYPE block = {0};
+    SIMFS_BLOCK_TYPE block;
     block.type = type;
     block.content.fileDescriptor.type = type;
     block.content.fileDescriptor.size = 0;

@@ -1,0 +1,19 @@
+//
+// Created by Skinner, Brian on 1/23/19.
+//
+
+#ifndef SIMFS_ERROR_H
+#define SIMFS_ERROR_H
+
+typedef enum simfs_error {
+    SIMFS_NO_ERROR,
+    SIMFS_ALLOC_ERROR,
+    SIMFS_DUPLICATE_ERROR,
+    SIMFS_NOT_FOUND_ERROR,
+    SIMFS_NOT_EMPTY_ERROR,
+    SIMFS_ACCESS_ERROR,
+    SIMFS_WRITE_ERROR,
+    SIMFS_READ_ERROR
+} SIMFS_ERROR;
+
+#endif //SIMFS_ERROR_H

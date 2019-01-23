@@ -16,7 +16,11 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 
-add_executable(simfs src/simfs.c src/simfs.test.c)
+add_executable(simfs
+        src/simfs.h
+        src/simfs.c
+
+        src/simfs.test.c src/volume.c src/volume.h src/block.c src/block.h src/bitvector.c src/bitvector.h src/context.c src/context.h src/error.c src/error.h)
 
 find_package(FUSE)
 if(${FUSE_FOUND})
