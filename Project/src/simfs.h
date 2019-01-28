@@ -14,13 +14,9 @@
 #include <limits.h>
 #include <stdio.h>
 
-#include "volume.h"
-#include "block.h"
-#include "context.h"
-
-
-
-
+#include "volume/volume.h"
+#include "common/block.h"
+#include "context/context.h"
 
 //
 // file descriptor node for blocks holding folder or file information
@@ -33,26 +29,7 @@
 //   for directories:
 //       the size indicates the number of files or directories in this folder
 //       the block reference points to an index block that holds references to the file and folder blocks
-//
 
-
-//
-// a block for holding data
-//
-
-
-//
-// various interpretations of a file system block
-//
-typedef struct simfs_node_type {
-    SIMFS_CONTENT_TYPE type;
-    union { // content depends on the type
-        SIMFS_FILE_DESCRIPTOR_TYPE fileDescriptor; // for directories and files
-        SIMFS_DATA_TYPE data; // for data
-        SIMFS_INDEX_TYPE index[SIMFS_INDEX_SIZE];  // for indices; all indices but the last point to data blocks
-        // the last points to another index block
-    } content;
-} SIMFS_BLOCK_TYPE;
 
 //
 // "physical" file system structure
@@ -70,8 +47,6 @@ typedef struct simfs_node_type {
 //
 //////////////////////////////////////////////////////////////////////////
 
-
-
 SIMFS_ERROR simfsMountFileSystem(char *simfsFileName);
 SIMFS_ERROR simfsUmountFileSystem(char *simfsFileName);
 SIMFS_ERROR simfsCreateFileSystem(char *simfsFileName);
@@ -85,15 +60,13 @@ SIMFS_ERROR simfsCloseFile(SIMFS_FILE_HANDLE_TYPE fileHandle);
 SIMFS_ERROR simfsWriteFile(SIMFS_FILE_HANDLE_TYPE fileHandle, char *writeBuffer);
 SIMFS_ERROR simfsReadFile(SIMFS_FILE_HANDLE_TYPE fileHandle, char **readBuffer);
 
-// ... other functions already in there
-unsigned long hash(char *str); //done - given
-
 /*
  * The following functions can be used to simulate FUSE context's user and 
  * process identifiers for testing. These identifiers are obtainable by 
  * calling fuse_get_context() the fuse library.
  */
 // follows FUSE naming convention
+
 struct fuse_context *simfs_debug_get_context();
 char *simfsGenerateContent(int size);
 

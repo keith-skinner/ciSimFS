@@ -3,7 +3,7 @@
 //
 
 #include "volume.h"
-#include "bitvector.h"
+#include "../common/bitvector.h"
 
 #include <stdio.h>
 
@@ -32,8 +32,8 @@ SIMFS_VOLUME * simfs_volume = NULL;
 
 bool initVolume(char * file)
 {
-    fopen(file, "rb");
-
+    //TODO: this.
+    return false;
 }
 
 // Todo: Make this multithread compatible

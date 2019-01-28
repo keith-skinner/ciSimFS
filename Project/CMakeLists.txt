@@ -20,7 +20,7 @@ add_executable(simfs
         src/simfs.h
         src/simfs.c
 
-        src/simfs.test.c src/volume.c src/volume.h src/block.c src/block.h src/bitvector.c src/bitvector.h src/context.c src/context.h src/error.c src/error.h)
+        src/simfs.test.c src/volume/volume.c src/volume/volume.h src/common/block.c src/common/block.h src/common/bitvector.c src/common/bitvector.h src/context/context.c src/context/context.h src/common/error.c src/common/error.h src/context/directory.c src/context/directory.h)
 
 find_package(FUSE)
 if(${FUSE_FOUND})
