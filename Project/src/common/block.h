@@ -7,10 +7,17 @@
 
 #include <unistd.h>
 
-#define SIMFS_BLOCK_SIZE 16 // 256
-#define SIMFS_DATA_SIZE 14 // 254 // SIMFS_BLOCK_SIZE - sizeof(SIMFS_NODE_TYPE)
-#define SIMFS_INDEX_SIZE 7 // 127 // two bytes => x0000 - xFFFF => 2^16 range
-#define SIMFS_MAX_NAME_LENGTH 64 // 128
+#ifdef SIMFS_LIGHT
+#define SIMFS_BLOCK_SIZE 16
+#define SIMFS_DATA_SIZE (SIMFS_BLOCK_SIZE - sizeof(SIMFS_NODE_TYPE))
+#define SIMFS_INDEX_SIZE 7 //3 bits => x0 - x7
+#define SIMFS_MAX_NAME_LENGTH 64
+#else //SIMFS_LIGHT
+#define SIMFS_BLOCK_SIZE 256
+#define SIMFS_DATA_SIZE (SIMFS_BLOCK_SIZE - sizeof(SIMFS_NODE_TYPE))
+#define SIMFS_INDEX_SIZE 127 // two bytes => x0000 - xFFFF => 2^16 range
+#define SIMFS_MAX_NAME_LENGTH 128
+#endif //SIMFS_LIGHT
 
 typedef enum {
     FOLDER_CONTENT_TYPE,

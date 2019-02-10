@@ -1,22 +1,19 @@
-/*
+/**
  * Keith Skinner
  * Lab: Project
  * Date: 12/13/2018
  */
+
 #include "simfs.h"
 #include <stdint.h>
 #include <math.h>
 #include <stdbool.h>
 
 void simfsCreateFileTime(SIMFS_BLOCK_TYPE *block);
-
 void mountDirectory(SIMFS_INDEX_TYPE index);
-
 void simfsDeallocateBlock(SIMFS_INDEX_TYPE index);
 
 SIMFS_INDEX_TYPE simfsAllocateBlock();
-
-
 
 
 /**

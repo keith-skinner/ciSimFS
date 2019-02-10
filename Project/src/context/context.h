@@ -10,9 +10,16 @@
 #include "../common/bitvector.h"
 #include "context.h"
 
+#ifdef SIMFS_LIGHT
 #define SIMFS_MAX_NUMBER_OF_OPEN_FILES 64 // 1024
 #define SIMFS_MAX_NUMBER_OF_PROCESSES 64 // 1024
 #define SIMFS_MAX_NUMBER_OF_OPEN_FILES_PER_PROCESS 16 // 64
+#else //SIMFS_LIGHT
+#define SIMFS_MAX_NUMBER_OF_OPEN_FILES 1024
+#define SIMFS_MAX_NUMBER_OF_PROCESSES 1024
+#define SIMFS_MAX_NUMBER_OF_OPEN_FILES_PER_PROCESS 64
+#endif //SIMFS_LIGHT
+
 
 //TODO: Make interaction functions w/ multithreading capabilities
 //TODO: See what you can hide in the .c file.

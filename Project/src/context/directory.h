@@ -7,9 +7,6 @@
 
 #include "../common/block.h"
 
-
-
-
 //node for hash table (SIMFS_DIRECTORY)
 typedef struct simfs_dir_ent {
     SIMFS_INDEX_TYPE nodeReference; // points to the "physical" file descriptor node
