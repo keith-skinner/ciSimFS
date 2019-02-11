@@ -515,16 +515,17 @@ SIMFS_ERROR simfsOpenFile(SIMFS_NAME_TYPE fileName, SIMFS_FILE_HANDLE_TYPE *file
     }
     if (openFileTableIndex == SIMFS_MAX_NUMBER_OF_OPEN_FILES) {
         for (openFileTableIndex = 0; openFileTableIndex < SIMFS_MAX_NUMBER_OF_OPEN_FILES; ++openFileTableIndex) {
-            if (simfsContext->globalOpenFileTable[openFileTableIndex].fileDescriptor == SIMFS_INVALID_INDEX) {
-                simfsContext->globalOpenFileTable[openFileTableIndex].fileDescriptor = file;
-                simfsContext->globalOpenFileTable[openFileTableIndex].referenceCount = 1;
-                simfsContext->globalOpenFileTable[openFileTableIndex].accessRights = simfsVolume->block[file].content.fileDescriptor.accessRights;
-                simfsContext->globalOpenFileTable[openFileTableIndex].type = simfsVolume->block[file].type;
-                simfsContext->globalOpenFileTable[openFileTableIndex].size = simfsVolume->block[file].content.fileDescriptor.size;
-                simfsContext->globalOpenFileTable[openFileTableIndex].creationTime = simfsVolume->block[file].content.fileDescriptor.creationTime;
-                simfsContext->globalOpenFileTable[openFileTableIndex].lastAccessTime = simfsVolume->block[file].content.fileDescriptor.lastAccessTime;
-                simfsContext->globalOpenFileTable[openFileTableIndex].lastModificationTime = simfsVolume->block[file].content.fileDescriptor.lastModificationTime;
-                simfsContext->globalOpenFileTable[openFileTableIndex].owner = simfsVolume->block[file].content.fileDescriptor.owner;
+            SIMFS_GLOBAL_OPEN_FILE openFile = simfsContext->globalOpenFileTable[openFileTableIndex];
+            if (openFile.fileDescriptor == SIMFS_INVALID_INDEX) {
+                openFile.fileDescriptor = file;
+                openFile.referenceCount = 1;
+                openFile.accessRights = simfsVolume->block[file].content.fileDescriptor.accessRights;
+                openFile.type = simfsVolume->block[file].type;
+                openFile.size = simfsVolume->block[file].content.fileDescriptor.size;
+                openFile.creationTime = simfsVolume->block[file].content.fileDescriptor.creationTime;
+                openFile.lastAccessTime = simfsVolume->block[file].content.fileDescriptor.lastAccessTime;
+                openFile.lastModificationTime = simfsVolume->block[file].content.fileDescriptor.lastModificationTime;
+                openFile.owner = simfsVolume->block[file].content.fileDescriptor.owner;
                 break;
             }
         }

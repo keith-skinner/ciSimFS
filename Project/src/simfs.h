@@ -18,6 +18,7 @@
 #include "common/block.h"
 #include "context/context.h"
 
+//TODO: get rid of these comments or move them
 //  file descriptor node for blocks holding folder or file information
 //  for files:
 //      the size indicates the size of the file

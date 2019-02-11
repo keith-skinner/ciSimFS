@@ -29,15 +29,15 @@ typedef int SIMFS_FILE_HANDLE_TYPE;
 
 
 typedef struct simfs_open_file_global_type {
-    SIMFS_CONTENT_TYPE type; // folder or file
-    SIMFS_INDEX_TYPE fileDescriptor; // reference to the file descriptor node
-    unsigned short referenceCount; // reference count
-    time_t creationTime; // creation time
-    time_t lastAccessTime; // last access
-    time_t lastModificationTime; // last modification
-    mode_t accessRights; // access rights for the file
-    uid_t owner; // owner ID
-    size_t size;
+    SIMFS_CONTENT_TYPE type;            // folder or file
+    SIMFS_INDEX_TYPE fileDescriptor;    // reference to the file descriptor node
+    unsigned short referenceCount;      // reference count
+    time_t creationTime;                // creation time
+    time_t lastAccessTime;              // last access
+    time_t lastModificationTime;        // last modification
+    mode_t accessRights;                // access rights for the file
+    uid_t owner;                        // owner ID
+    size_t size;                        // size of the file
 } SIMFS_GLOBAL_OPEN_FILE;
 
 
@@ -57,6 +57,9 @@ typedef struct simfs_per_process_open_file_type
  */
 typedef SIMFS_PROCESS_OPEN_FILE_NODE
     SIMFS_PROCESS_OPEN_FILES[SIMFS_MAX_NUMBER_OF_OPEN_FILES_PER_PROCESS];
+typedef SIMFS_GLOBAL_OPEN_FILE 
+    SIMFS_GLOBAL_OPEN_FILE_TABLE[SIMFS_MAX_NUMBER_OF_OPEN_FILES];
+
 
 typedef struct simfs_process_control_block_type {
     pid_t pid;
@@ -67,14 +70,13 @@ typedef struct simfs_process_control_block_type {
 } SIMFS_PROCESS_CONTROL_BLOCK;
 
 // file system context
-typedef SIMFS_GLOBAL_OPEN_FILE SIMFS_GLOBAL_OPEN_FILE_TABLE[SIMFS_MAX_NUMBER_OF_OPEN_FILES];
 typedef struct simfs_context_type {
     // the hashtable-based in-memory directory
     SIMFS_DIRECTORY directory;
     // an "in-memory" copy of the bitvector of the simulated volume
     SIMFS_BITVECTOR_TYPE bitvector;
 
-    SIMFS_GLOBAL_OPEN_FILE_TABLE globalOpenFileTable[SIMFS_MAX_NUMBER_OF_OPEN_FILES];
+    SIMFS_GLOBAL_OPEN_FILE_TABLE globalOpenFileTable;
     SIMFS_PROCESS_CONTROL_BLOCK *processControlBlocks;
 } SIMFS_CONTEXT_TYPE;
 
